@@ -1,5 +1,10 @@
 import numpy as np
 
+try:
+    import cv2
+except ImportError:
+    cv2 = None
+
 
 def preprocess(scopes, inputs):
     import warnings
@@ -26,6 +31,16 @@ def preprocess(scopes, inputs):
     if len(outputs) == 1:
         outputs = outputs[0]
     return outputs
+
+
+def direct(model_name, target_size):
+    if 'yolo' in model_name.lower():
+        def _direct(inputs):
+            return __preprocess_dict__[model_name](inputs, target_size)
+    else:
+        def _direct(inputs):
+            return __preprocess_dict__[model_name](inputs)
+    return _direct
 
 
 def bair_preprocess(x):
@@ -86,6 +101,33 @@ def wrn_preprocess(x):
     return x
 
 
+def darknet_preprocess(x, target_size=None):
+    # Refer to the following darkflow
+    # https://github.com/thtrieu/darkflow/blob/master/darkflow/net/yolo/predict.py
+    if target_size is None or target_size[0] is None or target_size[1] is None:
+        y = x.copy()
+    else:
+        h, w = target_size
+        assert cv2 is not None, 'resizing requires `cv2`.'
+        y = np.zeros((len(x), h, w, x.shape[3]))
+        for i in range(len(x)):
+            y[i] = cv2.resize(x[i], (w, h), interpolation=cv2.INTER_CUBIC)
+    y = y[:, :, :, ::-1]
+    y /= 255.
+    return y
+
+
+def faster_rcnn_preprocess(x):
+    # Refer to the following py-faster-rcnn
+    # https://github.com/rbgirshick/py-faster-rcnn/blob/master/lib/fast_rcnn/test.py#L22
+    # https://github.com/rbgirshick/py-faster-rcnn/blob/master/lib/fast_rcnn/config.py#L181
+    y = x.copy()
+    y[:, :, :, 0] -= 102.9801
+    y[:, :, :, 1] -= 115.9465
+    y[:, :, :, 2] -= 122.7717
+    return y
+
+
 # Dictionary for pre-processing functions.
 __preprocess_dict__ = {
     'inception': tfslim_preprocess,
@@ -103,9 +145,17 @@ __preprocess_dict__ = {
     'resnet101v2': tfslim_preprocess,
     'resnet152v2': tfslim_preprocess,
     'resnet200v2': fb_preprocess,
+    'resnext': fb_preprocess,
     'resnext50': fb_preprocess,
     'resnext101': fb_preprocess,
+    'resnext50c32': fb_preprocess,
+    'resnext101c32': fb_preprocess,
+    'resnext101c64': fb_preprocess,
     'wideresnet50': wrn_preprocess,
+    'nasnetAlarge': tfslim_preprocess,
+    'nasnetAmobile': tfslim_preprocess,
+    'vgg16': keras_resnet_preprocess,
+    'vgg19': keras_resnet_preprocess,
     'densenet': fb_preprocess,
     'densenet121': fb_preprocess,
     'densenet169': fb_preprocess,
@@ -116,4 +166,12 @@ __preprocess_dict__ = {
     'mobilenet75': tfslim_preprocess,
     'mobilenet100': tfslim_preprocess,
     'squeezenet': bair_preprocess,
+    'REFyolov2': darknet_preprocess,
+    'REFyolov2voc': darknet_preprocess,
+    'REFtinyyolov2voc': darknet_preprocess,
+    'REFfasterrcnnZFvoc': faster_rcnn_preprocess,
+    'REFfasterrcnnVGG16voc': faster_rcnn_preprocess,
+    'genYOLOv2': darknet_preprocess,
+    'genTinyYOLOv2': darknet_preprocess,
+    'genFasterRCNN': faster_rcnn_preprocess,
 }

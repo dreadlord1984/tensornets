@@ -16,7 +16,16 @@ from .resnets import ResNet152v2
 from .resnets import ResNet200v2
 from .resnets import ResNeXt50
 from .resnets import ResNeXt101
+from .resnets import ResNeXt50c32
+from .resnets import ResNeXt101c32
+from .resnets import ResNeXt101c64
 from .resnets import WideResNet50
+
+from .nasnets import NASNetAlarge
+from .nasnets import NASNetAmobile
+
+from .vggs import VGG16
+from .vggs import VGG19
 
 from .densenets import DenseNet121
 from .densenets import DenseNet169
@@ -29,9 +38,30 @@ from .mobilenets import MobileNet100
 
 from .squeezenets import SqueezeNet
 
+from .capsulenets import CapsuleNet
+
+from .references import YOLOv2COCO
+from .references import YOLOv2VOC
+from .references import TinyYOLOv2COCO
+from .references import TinyYOLOv2VOC
+
+from .references import FasterRCNN_ZF_VOC
+from .references import FasterRCNN_VGG16_VOC
+
+from .darknets import Darknet19
+from .darknets import TinyDarknet19
+
+from .zf import ZF
+
+from .detections import YOLOv2
+from .detections import TinyYOLOv2
+from .detections import FasterRCNN
+
 from .preprocess import preprocess
-from .pretrained import pretrained
+from .pretrained import assign as pretrained
 
 from .utils import *
+
+__version__ = '0.3.1'
 
 remove_utils(__name__, ['init'])

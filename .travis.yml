@@ -4,7 +4,15 @@ matrix:
     - python: 2.7
       env: TEST_MODE=PEP8
     - python: 2.7
-    - python: 3.5
+      env: TF_VERSION=1.2.0
+    - python: 2.7
+      env: TF_VERSION=1.3.0
+    - python: 2.7
+      env: TF_VERSION=1.4.0
+    - python: 2.7
+      env: TF_VERSION=1.5.0
+    - python: 2.7
+    - python: 3.6
 notifications:
   email: false
 # Adapted from
@@ -27,15 +35,28 @@ install:
   - conda info -a
 
   # Replace dep1 dep2 ... with your dependencies
-  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib pytest pytest-pep8
+  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
   - source activate test-environment
+  - pip install --only-binary=numpy,scipy numpy scipy opencv-python pytest pytest-pep8
+
+  # YOLO dependencies
+  - pip install cython
+  - pip install git+https://github.com/thtrieu/darkflow
 
   - pip install .
-  - pip install tensorflow
+  - if [ -z "$TF_VERSION" ]; then
+      pip install tensorflow;
+    else
+      pip install tensorflow==$TF_VERSION;
+    fi
+
+  # Detect whether core files are changed or not
+  - export CORE_CHANGED=True;
+  - for entry in `git diff --name-only HEAD~1`; do if [[ "$entry" == "README.md" ]]; then export CORE_CHANGED=False; fi; done
 
 script:
   - if [[ "$TEST_MODE" == "PEP8" ]]; then
-       PYTHONPATH=$PWD:$PYTHONPATH py.test --pep8;
+       PYTHONPATH=$PWD:$PYTHONPATH py.test --pep8 -m pep8;
     else
-       PYTHONPATH=$PWD:$PYTHONPATH py.test tests/;
+       PYTHONPATH=$PWD:$PYTHONPATH py.test tests/ --verbose --ignore=tests/all*;
     fi

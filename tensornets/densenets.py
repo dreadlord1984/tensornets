@@ -18,16 +18,14 @@ import tensorflow as tf
 from .layers import avg_pool2d
 from .layers import batch_norm
 from .layers import conv2d
-from .layers import fully_connected
+from .layers import fc
 from .layers import max_pool2d
 from .layers import convbnrelu as conv
 
 from .ops import *
+from .utils import pad_info
 from .utils import set_args
 from .utils import var_scope
-
-
-__layers__ = [avg_pool2d, batch_norm, conv2d, fully_connected, max_pool2d]
 
 
 def __args__(is_training):
@@ -36,13 +34,13 @@ def __args__(is_training):
                             'epsilon': 1e-5, 'scope': 'bn'}),
             ([conv2d], {'padding': 'VALID', 'activation_fn': None,
                         'biases_initializer': None, 'scope': 'conv'}),
-            ([fully_connected], {'activation_fn': None, 'scope': 'fc'})]
+            ([fc], {'activation_fn': None, 'scope': 'fc'})]
 
 
-def densenet(x, blocks, is_training, classes, scope=None, reuse=None):
-    x = pad(x, [[0, 0], [3, 3], [3, 3], [0, 0]], name='conv1/pad')
+def densenet(x, blocks, is_training, classes, stem, scope=None, reuse=None):
+    x = pad(x, pad_info(7), name='conv1/pad')
     x = conv(x, 64, 7, stride=2, scope='conv1')
-    x = pad(x, [[0, 0], [1, 1], [1, 1], [0, 0]], name='pool1/pad')
+    x = pad(x, pad_info(3), name='pool1/pad')
     x = max_pool2d(x, 3, stride=2, scope='pool1')
 
     x = dense(x, blocks[0], scope='conv2')
@@ -54,29 +52,36 @@ def densenet(x, blocks, is_training, classes, scope=None, reuse=None):
     x = dense(x, blocks[3], scope='conv5')
 
     x = batch_norm(x)
+    if stem: return x
+
     x = reduce_mean(x, [1, 2], name='avgpool')
-    x = fully_connected(x, classes, scope='logits')
+    x = fc(x, classes, scope='logits')
     x = softmax(x, name='probs')
-    x.aliases = [tf.get_variable_scope().name]
     return x
 
 
 @var_scope('densenet121')
-@set_args(__layers__, __args__)
-def densenet121(x, is_training=False, classes=1000, scope=None, reuse=None):
-    return densenet(x, [6, 12, 24, 16], is_training, classes, scope, reuse)
+@set_args(__args__)
+def densenet121(x, is_training=False, classes=1000,
+                stem=False, scope=None, reuse=None):
+    return densenet(x, [6, 12, 24, 16], is_training, classes,
+                    stem, scope, reuse)
 
 
 @var_scope('densenet169')
-@set_args(__layers__, __args__)
-def densenet169(x, is_training=False, classes=1000, scope=None, reuse=None):
-    return densenet(x, [6, 12, 32, 32], is_training, classes, scope, reuse)
+@set_args(__args__)
+def densenet169(x, is_training=False, classes=1000,
+                stem=False, scope=None, reuse=None):
+    return densenet(x, [6, 12, 32, 32], is_training, classes,
+                    stem, scope, reuse)
 
 
 @var_scope('densenet201')
-@set_args(__layers__, __args__)
-def densenet201(x, is_training=False, classes=1000, scope=None, reuse=None):
-    return densenet(x, [6, 12, 48, 32], is_training, classes, scope, reuse)
+@set_args(__args__)
+def densenet201(x, is_training=False, classes=1000,
+                stem=False, scope=None, reuse=None):
+    return densenet(x, [6, 12, 48, 32], is_training, classes,
+                    stem, scope, reuse)
 
 
 @var_scope('dense')
@@ -101,7 +106,7 @@ def block(x, growth_rate=32, scope=None):
     x1 = relu(x1)
     x1 = conv(x1, 4 * growth_rate, 1, stride=1, scope='1')
     x1 = conv2d(x1, growth_rate, 3, stride=1, padding='SAME', scope='2/conv')
-    x = concat([x, x1], axis=3, name='concat')
+    x = concat([x, x1], axis=3, name='out')
     return x
 
 

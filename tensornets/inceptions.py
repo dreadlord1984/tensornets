@@ -24,7 +24,7 @@ The reference papers:
 The reference implementations:
 
 1. (initially and mainly for v3) Keras
- - https://github.com/fchollet/keras/blob/master/keras/applications/
+ - https://github.com/keras-team/keras/blob/master/keras/applications/
    inception_v3.py
 2. (mainly for v1,2,4,resnetv2) TF Slim
  - https://github.com/tensorflow/models/blob/master/research/slim/nets/
@@ -41,19 +41,16 @@ from .layers import avg_pool2d
 from .layers import batch_norm
 from .layers import conv2d
 from .layers import dropout
-from .layers import fully_connected
+from .layers import fc
 from .layers import max_pool2d
 from .layers import separable_conv2d
 from .layers import convrelu0 as conv0
 from .layers import convbnrelu as conv
 
 from .ops import *
+from .utils import pad_info
 from .utils import set_args
 from .utils import var_scope
-
-
-__layers__ = [avg_pool2d, batch_norm, conv2d, dropout,
-              fully_connected, max_pool2d, separable_conv2d]
 
 
 def __args__(is_training):
@@ -63,14 +60,15 @@ def __args__(is_training):
             ([conv2d], {'padding': 'SAME', 'activation_fn': None,
                         'biases_initializer': None, 'scope': 'conv'}),
             ([dropout], {'is_training': is_training, 'scope': 'dropout'}),
-            ([fully_connected], {'activation_fn': None, 'scope': 'fc'}),
+            ([fc], {'activation_fn': None, 'scope': 'fc'}),
             ([separable_conv2d], {'padding': 'SAME', 'scope': 'sconv'})]
 
 
 @var_scope('inception1')
-@set_args(__layers__, __args__)
-def inception1(x, is_training=False, classes=1000, scope=None, reuse=None):
-    x = pad(x, [[0, 0], [3, 3], [3, 3], [0, 0]], name='pad')
+@set_args(__args__)
+def inception1(x, is_training=False, classes=1000,
+               stem=False, scope=None, reuse=None):
+    x = pad(x, pad_info(7), name='pad')
     x = conv0(x, 64, 7, stride=2, padding='VALID', scope='block1')
     x = max_pool2d(x, 3, stride=2, scope='pool1')
     x = lrn(x, depth_radius=2, alpha=0.00002, beta=0.75, name='lrn1')
@@ -95,18 +93,19 @@ def inception1(x, is_training=False, classes=1000, scope=None, reuse=None):
 
     x = inception(x, [256, [160, 320], [32, 128], 128], scope='block5a')
     x = inception(x, [384, [192, 384], [48, 128], 128], scope='block5b')
+    if stem: return x
 
     x = reduce_mean(x, [1, 2], name='avgpool')
     x = dropout(x, keep_prob=0.8, scope='dropout')
-    x = fully_connected(x, classes, scope='logits')
+    x = fc(x, classes, scope='logits')
     x = softmax(x, name='probs')
-    x.aliases = [tf.get_variable_scope().name]
     return x
 
 
 @var_scope('inception2')
-@set_args(__layers__, __args__)
-def inception2(x, is_training=False, classes=1000, scope=None, reuse=None):
+@set_args(__args__)
+def inception2(x, is_training=False, classes=1000,
+               stem=False, scope=None, reuse=None):
     x = separable_conv2d(x, 64, 7, stride=2, depth_multiplier=8.,
                          activation_fn=None, scope='block1')
     x = max_pool2d(x, 3, stride=2, scope='pool1')
@@ -132,18 +131,19 @@ def inception2(x, is_training=False, classes=1000, scope=None, reuse=None):
     x = inceptionA(x, [352, [192, 320], [160, 224], 128], scope='block5a')
     x = inceptionA(x, [352, [192, 320], [192, 224], 128],
                    pool_fn=max_pool2d, scope='block5b')
+    if stem: return x
 
     x = reduce_mean(x, [1, 2], name='avgpool')
     x = dropout(x, keep_prob=0.8, scope='dropout')
-    x = fully_connected(x, classes, scope='logits')
+    x = fc(x, classes, scope='logits')
     x = softmax(x, name='probs')
-    x.aliases = [tf.get_variable_scope().name]
     return x
 
 
 @var_scope('inception3')
-@set_args(__layers__, __args__)
-def inception3(x, is_training=False, classes=1000, scope=None, reuse=None):
+@set_args(__args__)
+def inception3(x, is_training=False, classes=1000,
+               stem=False, scope=None, reuse=None):
     x = conv(x, 32, 3, stride=2, padding='VALID', scope='block1a')
     x = conv(x, 32, 3, padding='VALID', scope='block2a')
     x = conv(x, 64, 3, scope='block2b')
@@ -168,17 +168,18 @@ def inception3(x, is_training=False, classes=1000, scope=None, reuse=None):
 
     x = inceptionC(x, [320, [384] * 3, [448, 384], 192], scope='block7b')
     x = inceptionC(x, [320, [384] * 3, [448, 384], 192], scope='block7c')
+    if stem: return x
 
     x = reduce_mean(x, [1, 2], name='avgpool')
-    x = fully_connected(x, classes, scope='logits')
+    x = fc(x, classes, scope='logits')
     x = softmax(x, name='probs')
-    x.aliases = [tf.get_variable_scope().name]
     return x
 
 
 @var_scope('inception4')
-@set_args(__layers__, __args__)
-def inception4(x, is_training=False, classes=1000, scope=None, reuse=None):
+@set_args(__args__)
+def inception4(x, is_training=False, classes=1000,
+               stem=False, scope=None, reuse=None):
     x = stemA(x)
     for i in range(4):
         x = inceptionA(x, [96, [64, 96], [64, 96], 96],
@@ -193,16 +194,16 @@ def inception4(x, is_training=False, classes=1000, scope=None, reuse=None):
     for i in range(3):
         x = inceptionC(x, [256, [384, 256, 256], [384, 448, 512, 256], 256],
                        scope="block7%c" % (98 + i))
+    if stem: return x
 
     x = reduce_mean(x, [1, 2], name='avgpool')
     x = dropout(x, keep_prob=0.8, scope='dropout')
-    x = fully_connected(x, classes, scope='logits')
+    x = fc(x, classes, scope='logits')
     x = softmax(x, name='probs')
-    x.aliases = [tf.get_variable_scope().name]
     return x
 
 
-def inceptionresnet(x, stem_fn, A, B, C, is_training, classes,
+def inceptionresnet(x, stem_fn, A, B, C, is_training, classes, stem,
                     scope=None, reuse=None):
     x = stem_fn(x)
     for i in range(A['blocks']):
@@ -223,19 +224,19 @@ def inceptionresnet(x, stem_fn, A, B, C, is_training, classes,
         x = inceptionRB(x, C['filters'], k=3, activation_fn=None,
                         scope="block7%c" % (98 + C['blocks']))
         x = conv(x, 1536, 1, scope='conv')
+    if stem: return x
 
     x = reduce_mean(x, [1, 2], name='avgpool')
     x = dropout(x, keep_prob=0.8, scope='dropout')
-    x = fully_connected(x, classes, scope='logits')
+    x = fc(x, classes, scope='logits')
     x = softmax(x, name='probs')
-    x.aliases = [tf.get_variable_scope().name]
     return x
 
 
 @var_scope('inceptionresnet1')
-@set_args(__layers__, __args__)
+@set_args(__args__)
 def inceptionresnet1(x, is_training=False, classes=1000,
-                     scope=None, reuse=None):
+                     stem=False, scope=None, reuse=None):
     return inceptionresnet(
         x, stemB,
         {'blocks': 5, 'filters': [32, 32, [32, 32, 32], 256],
@@ -243,13 +244,13 @@ def inceptionresnet1(x, is_training=False, classes=1000,
         {'blocks': 10, 'filters': [128, [128, 128, 128], 896],
          'reduction': [256, 384, 256, 256]},
         {'blocks': 5, 'filters': [192, [192, 192, 192], 1792]},
-        is_training, classes, scope, reuse)
+        is_training, classes, stem, scope, reuse)
 
 
 @var_scope('inceptionresnet2')
-@set_args(__layers__, __args__)
+@set_args(__args__)
 def inceptionresnet2(x, is_training=False, classes=1000,
-                     scope=None, reuse=None):
+                     stem=False, scope=None, reuse=None):
     return inceptionresnet(
         x, stemA,
         {'blocks': 10, 'filters': [32, 32, [32, 48, 64], 384],
@@ -257,13 +258,13 @@ def inceptionresnet2(x, is_training=False, classes=1000,
         {'blocks': 20, 'filters': [192, [128, 160, 192], 1154],
          'reduction': [256, 384, 288, 320]},
         {'blocks': 10, 'filters': [192, [192, 224, 256], 2048]},
-        is_training, classes, scope, reuse)
+        is_training, classes, stem, scope, reuse)
 
 
 @var_scope('inceptionresnet2_tfslim')
-@set_args(__layers__, __args__)
+@set_args(__args__)
 def inceptionresnetS(x, is_training=False, classes=1000,
-                     scope=None, reuse=None):
+                     stem=False, scope=None, reuse=None):
     return inceptionresnet(
         x, stemS,
         {'blocks': 10, 'filters': [32, 32, [32, 48, 64], 320],
@@ -271,7 +272,7 @@ def inceptionresnetS(x, is_training=False, classes=1000,
         {'blocks': 20, 'filters': [192, [128, 160, 192], 1088],
          'reduction': [256, 384, 288, 320]},
         {'blocks': 9, 'filters': [192, [192, 224, 256], 2080]},
-        is_training, classes, scope, reuse)
+        is_training, classes, stem, scope, reuse)
 
 
 def stemA(x):
